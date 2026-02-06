@@ -44,7 +44,6 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -99,34 +98,23 @@ class Blockchain:
 
         # Difficulty and timing parameters
         if development_mode:
-            try:
-                from src.consensus.difficulty import (
-                    DEV_GENESIS_DIFFICULTY_BITS,
-                    DEV_DIFFICULTY_ADJUSTMENT_INTERVAL,
-                    DEV_TARGET_BLOCK_TIME,
-                )
-                self._difficulty_bits: int = DEV_GENESIS_DIFFICULTY_BITS
-                self._adjustment_interval: int = DEV_DIFFICULTY_ADJUSTMENT_INTERVAL
-                self._target_block_time: int = DEV_TARGET_BLOCK_TIME
-            except ImportError:
-                # Sensible defaults if the difficulty module is not yet available
-                self._difficulty_bits = 0x1f0fffff
-                self._adjustment_interval = 10
-                self._target_block_time = 5
+            from src.consensus.difficulty import (
+                DEV_GENESIS_DIFFICULTY_BITS,
+                DEV_DIFFICULTY_ADJUSTMENT_INTERVAL,
+                DEV_TARGET_BLOCK_TIME,
+            )
+            self._difficulty_bits: int = DEV_GENESIS_DIFFICULTY_BITS
+            self._adjustment_interval: int = DEV_DIFFICULTY_ADJUSTMENT_INTERVAL
+            self._target_block_time: int = DEV_TARGET_BLOCK_TIME
         else:
-            try:
-                from src.consensus.difficulty import (
-                    GENESIS_DIFFICULTY_BITS,
-                    DIFFICULTY_ADJUSTMENT_INTERVAL,
-                    TARGET_BLOCK_TIME,
-                )
-                self._difficulty_bits = GENESIS_DIFFICULTY_BITS
-                self._adjustment_interval = DIFFICULTY_ADJUSTMENT_INTERVAL
-                self._target_block_time = TARGET_BLOCK_TIME
-            except ImportError:
-                self._difficulty_bits = 0x1d00ffff
-                self._adjustment_interval = 2016
-                self._target_block_time = 600
+            from src.consensus.difficulty import (
+                GENESIS_DIFFICULTY_BITS,
+                DIFFICULTY_ADJUSTMENT_INTERVAL,
+                TARGET_BLOCK_TIME,
+            )
+            self._difficulty_bits = GENESIS_DIFFICULTY_BITS
+            self._adjustment_interval = DIFFICULTY_ADJUSTMENT_INTERVAL
+            self._target_block_time = TARGET_BLOCK_TIME
 
         # The target timespan is the ideal total time for one adjustment interval
         self._target_timespan: int = self._adjustment_interval * self._target_block_time
@@ -162,11 +150,8 @@ class Blockchain:
         genesis_timestamp = 1231006505
 
         # Create coinbase transaction paying the genesis reward
-        try:
-            from src.consensus.difficulty import get_block_reward
-            reward = get_block_reward(0)
-        except ImportError:
-            reward = 5000000000  # 50 BTC in satoshis
+        from src.consensus.difficulty import get_block_reward
+        reward = get_block_reward(0)
 
         coinbase_tx = Transaction.create_coinbase(
             block_height=0,
@@ -176,12 +161,8 @@ class Blockchain:
         )
 
         # Compute the merkle root from the single coinbase transaction
-        try:
-            from src.crypto.merkle import compute_merkle_root
-            merkle_root = compute_merkle_root([coinbase_tx.txid])
-        except ImportError:
-            # Fallback: for a single tx the merkle root equals the txid
-            merkle_root = coinbase_tx.txid
+        from src.crypto.merkle import compute_merkle_root
+        merkle_root = compute_merkle_root([coinbase_tx.txid])
 
         # Build the genesis block header
         header = BlockHeader(
@@ -375,12 +356,7 @@ class Blockchain:
             branches.
         """
         hashes = self.block_height_index.get(height, [])
-        blocks = []
-        for h in hashes:
-            blk = self.blocks.get(h)
-            if blk is not None:
-                blocks.append(blk)
-        return blocks
+        return [self.blocks[h] for h in hashes if h in self.blocks]
 
     # ------------------------------------------------------------------
     # Chain tips and navigation  (Task 5.3)
@@ -623,7 +599,7 @@ class Blockchain:
         # Process transactions in reverse order
         for tx in reversed(block.transactions):
             # Remove outputs (they were added when the block was applied)
-            for idx in range(len(tx.outputs)):
+            for idx, _ in enumerate(tx.outputs):
                 try:
                     self.utxo_set.remove_utxo(tx.txid, idx)
                 except Exception:
@@ -750,13 +726,10 @@ class Blockchain:
         Returns:
             The expected compact difficulty target (difficulty_bits).
         """
-        try:
-            from src.consensus.difficulty import (
-                should_adjust,
-                calculate_next_difficulty,
-            )
-        except ImportError:
-            return self._difficulty_bits
+        from src.consensus.difficulty import (
+            should_adjust,
+            calculate_next_difficulty,
+        )
 
         if height == 0:
             return self._difficulty_bits

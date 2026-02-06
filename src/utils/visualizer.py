@@ -397,22 +397,14 @@ class BlockchainVisualizer:
                 self.console.print(table)
         else:
             # General UTXO set summary
-            try:
-                utxo_dict = utxo_set.to_dict()
-                utxo_entries = utxo_dict.get("utxos", utxo_dict)
-                if isinstance(utxo_entries, dict):
-                    total_utxos = len(utxo_entries)
-                else:
-                    total_utxos = 0
-            except Exception:
-                total_utxos = 0
-
+            total_utxos = 0
             total_value = 0
             try:
                 utxo_dict = utxo_set.to_dict()
                 utxo_entries = utxo_dict.get("utxos", utxo_dict)
                 if isinstance(utxo_entries, dict):
-                    for key, entry in utxo_entries.items():
+                    total_utxos = len(utxo_entries)
+                    for entry in utxo_entries.values():
                         if isinstance(entry, dict):
                             total_value += entry.get("value", 0)
             except Exception:

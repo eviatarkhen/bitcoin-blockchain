@@ -148,12 +148,7 @@ class Mempool:
         ordered_txids = [txid for _, txid in self._fee_index]
         if limit is not None:
             ordered_txids = ordered_txids[:limit]
-        result = []
-        for txid in ordered_txids:
-            tx = self.transactions.get(txid)
-            if tx is not None:
-                result.append(tx)
-        return result
+        return [self.transactions[txid] for txid in ordered_txids if txid in self.transactions]
 
     def get_transaction(self, txid: str) -> "Transaction | None":
         """

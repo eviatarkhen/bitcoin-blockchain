@@ -21,10 +21,9 @@ integers and variable-length integer prefixes for lists and byte arrays.
 
 from __future__ import annotations
 
-import hashlib
-import struct
 from typing import Optional
 
+from src.crypto.hash import double_sha256
 from src.utils.encoding import (
     bytes_to_hex,
     hex_to_bytes,
@@ -34,11 +33,6 @@ from src.utils.encoding import (
     decode_varint,
     base58check_encode,
 )
-
-
-def double_sha256(data: bytes) -> bytes:
-    """Compute double SHA-256 hash as used in Bitcoin."""
-    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 
 # ---------------------------------------------------------------------------

@@ -379,21 +379,13 @@ class Miner:
         if coinbase_tx.inputs:
             coinbase_input = coinbase_tx.inputs[0]
             # Encode extra_nonce as bytes and set it in the signature script.
-            # We calculate the byte length needed and encode as little-endian.
             extra_nonce_bytes = extra_nonce.to_bytes(
                 max(1, (extra_nonce.bit_length() + 7) // 8),
                 byteorder='little'
             )
-            # Set or append the extra nonce to the signature script
-            if hasattr(coinbase_input, 'signature_script'):
-                # Replace or append extra nonce data
-                coinbase_input.signature_script = (
-                    coinbase_input.signature_script + extra_nonce_bytes
-                )
-            elif hasattr(coinbase_input, 'script_sig'):
-                coinbase_input.script_sig = (
-                    coinbase_input.script_sig + extra_nonce_bytes
-                )
+            coinbase_input.signature_script = (
+                coinbase_input.signature_script + extra_nonce_bytes
+            )
 
         # Recalculate the merkle root since the coinbase transaction changed
         block.header.merkle_root = block.calculate_merkle_root()
@@ -495,9 +487,7 @@ def create_block_template(
         transactions=all_transactions
     )
 
-    # Set the block height if the Block supports it
-    if hasattr(block, '_height'):
-        block._height = height
+    block._height = height
 
     # Step 5: Calculate and set the merkle root
     merkle_root = block.calculate_merkle_root()

@@ -36,24 +36,7 @@ Simplified Payment Verification (SPV) clients described in Section 8 of
 the Bitcoin whitepaper.
 """
 
-import hashlib
-
-
-def double_sha256(data: bytes) -> bytes:
-    """
-    Compute the double SHA-256 hash: SHA-256(SHA-256(data)).
-
-    This is the hash function used for all internal Merkle tree nodes in
-    Bitcoin. Using a local copy here to avoid circular imports and keep
-    the module self-contained.
-
-    Args:
-        data: The raw bytes to hash.
-
-    Returns:
-        The 32-byte double-SHA-256 digest.
-    """
-    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
+from .hash import double_sha256
 
 
 class MerkleTree:

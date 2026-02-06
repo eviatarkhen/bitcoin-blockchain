@@ -9,11 +9,7 @@ Tests cover:
 - Edge cases: empty, single leaf, odd number of leaves
 """
 
-import os
-import sys
 import hashlib
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 

@@ -18,9 +18,9 @@ appears to have leading zeros when the block meets its difficulty target).
 
 from __future__ import annotations
 
-import hashlib
 from typing import Optional
 
+from src.crypto.hash import double_sha256
 from src.utils.encoding import (
     bytes_to_hex,
     hex_to_bytes,
@@ -30,11 +30,6 @@ from src.utils.encoding import (
     decode_varint,
 )
 from src.core.transaction import Transaction
-
-
-def double_sha256(data: bytes) -> bytes:
-    """Compute double SHA-256 hash as used in Bitcoin."""
-    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 
 # ---------------------------------------------------------------------------

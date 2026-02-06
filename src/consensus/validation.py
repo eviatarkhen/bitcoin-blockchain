@@ -112,6 +112,16 @@ def validate_block(block: "Block", blockchain: object) -> bool:
                 f"Previous block {prev_hash[:16]} not found in blockchain"
             )
 
+    # Compute the expected height once (used by multiple checks below)
+    if is_genesis:
+        expected_height = 0
+    else:
+        parent = blockchain.get_block(prev_hash)
+        if parent is not None and parent.height is not None:
+            expected_height = parent.height + 1
+        else:
+            expected_height = blockchain.get_chain_height() + 1
+
     # ---------------------------------------------------------------
     # 3. Merkle root must match computed value from transactions
     # ---------------------------------------------------------------
@@ -125,57 +135,37 @@ def validate_block(block: "Block", blockchain: object) -> bool:
     # ---------------------------------------------------------------
     # 4. Timestamp validation
     # ---------------------------------------------------------------
-    try:
-        from src.consensus.rules import validate_timestamp
-        if not is_genesis:
-            previous_timestamps = blockchain.get_previous_timestamps(prev_hash, count=11)
-            if not validate_timestamp(block.header.timestamp, previous_timestamps, int(time.time())):
-                raise ValidationError(
-                    f"Block timestamp {block.header.timestamp} is invalid"
-                )
-    except ImportError:
-        logger.warning("Could not import validate_timestamp; skipping timestamp check")
+    from src.consensus.rules import (
+        validate_timestamp,
+        validate_block_size,
+        validate_coinbase,
+        validate_no_duplicate_txids,
+    )
+    if not is_genesis:
+        previous_timestamps = blockchain.get_previous_timestamps(prev_hash, count=11)
+        if not validate_timestamp(block.header.timestamp, previous_timestamps, int(time.time())):
+            raise ValidationError(
+                f"Block timestamp {block.header.timestamp} is invalid"
+            )
 
     # ---------------------------------------------------------------
     # 5. Block size check
     # ---------------------------------------------------------------
-    try:
-        from src.consensus.rules import validate_block_size
-        if not validate_block_size(block):
-            raise ValidationError("Block exceeds maximum allowed size")
-    except ImportError:
-        logger.warning("Could not import validate_block_size; skipping size check")
+    if not validate_block_size(block):
+        raise ValidationError("Block exceeds maximum allowed size")
 
     # ---------------------------------------------------------------
     # 6. Coinbase validation
     # ---------------------------------------------------------------
-    try:
-        from src.consensus.rules import validate_coinbase
-        # Determine expected height
-        if is_genesis:
-            expected_height = 0
-        else:
-            parent = blockchain.get_block(prev_hash)
-            if parent is not None and parent.height is not None:
-                expected_height = parent.height + 1
-            else:
-                expected_height = blockchain.get_chain_height() + 1
-        if not validate_coinbase(block, expected_height):
-            raise ValidationError("Invalid coinbase transaction")
-    except ImportError:
-        logger.warning("Could not import validate_coinbase; skipping coinbase check")
+    if not validate_coinbase(block, expected_height):
+        raise ValidationError("Invalid coinbase transaction")
 
     # ---------------------------------------------------------------
     # 7. Validate all transactions in the block
     # ---------------------------------------------------------------
     if not is_genesis:
         try:
-            parent = blockchain.get_block(prev_hash)
-            if parent is not None and parent.height is not None:
-                block_height = parent.height + 1
-            else:
-                block_height = blockchain.get_chain_height() + 1
-            validate_block_transactions(block, blockchain.utxo_set, block_height)
+            validate_block_transactions(block, blockchain.utxo_set, expected_height)
         except ValidationError:
             raise
         except Exception as e:
@@ -184,23 +174,14 @@ def validate_block(block: "Block", blockchain: object) -> bool:
     # ---------------------------------------------------------------
     # 8. No duplicate txids within the block
     # ---------------------------------------------------------------
-    try:
-        from src.consensus.rules import validate_no_duplicate_txids
-        if not validate_no_duplicate_txids(block.transactions):
-            raise ValidationError("Block contains duplicate transaction IDs")
-    except ImportError:
-        logger.warning("Could not import validate_no_duplicate_txids; skipping check")
+    if not validate_no_duplicate_txids(block.transactions):
+        raise ValidationError("Block contains duplicate transaction IDs")
 
     # ---------------------------------------------------------------
     # 9. Difficulty bits must match expected value
     # ---------------------------------------------------------------
     if not is_genesis:
         try:
-            parent = blockchain.get_block(prev_hash)
-            if parent is not None and parent.height is not None:
-                expected_height = parent.height + 1
-            else:
-                expected_height = blockchain.get_chain_height() + 1
             expected_bits = blockchain._get_next_difficulty(expected_height)
             if block.header.difficulty_bits != expected_bits:
                 raise ValidationError(
@@ -346,23 +327,20 @@ def validate_transaction(
             )
 
         # 4. Coinbase maturity check
-        try:
-            from src.consensus.rules import validate_coinbase_maturity
-            if not validate_coinbase_maturity(
-                inp.previous_txid, inp.previous_output_index,
-                utxo, current_height
-            ):
-                raise ValidationError(
-                    f"Input {i} fails coinbase maturity check "
-                    f"(UTXO from height {utxo.block_height}, current height {current_height})"
-                )
-        except ImportError:
-            logger.warning("Could not import validate_coinbase_maturity; skipping check")
+        from src.consensus.rules import validate_coinbase_maturity
+        if not validate_coinbase_maturity(
+            inp.previous_txid, inp.previous_output_index,
+            utxo, current_height
+        ):
+            raise ValidationError(
+                f"Input {i} fails coinbase maturity check "
+                f"(UTXO from height {utxo.block_height}, current height {current_height})"
+            )
 
         total_input_value += utxo.value
 
     # 5. Signature validation (best-effort)
-    for i in range(len(tx.inputs)):
+    for i, _ in enumerate(tx.inputs):
         try:
             if not validate_transaction_signature(tx, i, utxo_set):
                 raise ValidationError(f"Invalid signature for input {i}")
@@ -419,14 +397,7 @@ def validate_transaction_signature(
         True if the signature is valid (or if crypto modules are unavailable,
         in which case we log a warning and return True for graceful degradation).
     """
-    try:
-        from src.crypto.keys import PublicKey, verify_transaction_input
-    except ImportError:
-        logger.warning(
-            "Crypto module not available; skipping signature verification "
-            "for input %d", input_index
-        )
-        return True
+    from src.crypto.keys import PublicKey, verify_transaction_input
 
     try:
         inp = tx.inputs[input_index]

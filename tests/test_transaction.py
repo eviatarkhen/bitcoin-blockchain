@@ -10,11 +10,6 @@ Tests cover:
 - TransactionOutput and TransactionInput to_dict/from_dict
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import pytest
 
 from src.core.transaction import Transaction, TransactionInput, TransactionOutput

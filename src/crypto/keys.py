@@ -42,72 +42,12 @@ WIF is a Base58Check-encoded format for private keys that includes:
 - A 4-byte checksum (first 4 bytes of double-SHA-256 of the above)
 """
 
-import hashlib
-import os
-
-import base58
 import ecdsa
 from ecdsa import SECP256k1, SigningKey, VerifyingKey
 from ecdsa.util import sigencode_der, sigdecode_der
 
 from .hash import double_sha256, hash160
-
-
-# =============================================================================
-# Internal Helper Functions
-# =============================================================================
-
-def _base58check_encode(version: bytes, payload: bytes) -> str:
-    """
-    Encode data with Base58Check encoding used in Bitcoin.
-
-    Base58Check encoding adds a version byte prefix and a 4-byte checksum
-    suffix to the payload, then encodes the result using Base58.
-
-    Base58 is like Base64 but omits characters that are easily confused:
-    0 (zero), O (capital o), I (capital i), l (lowercase L), +, and /.
-    This makes addresses easier to read and transcribe by hand.
-
-    The checksum (first 4 bytes of double-SHA-256) detects typos in
-    manually entered addresses.
-
-    Args:
-        version: The version byte(s) identifying the data type.
-                 0x00 = mainnet address, 0x05 = mainnet P2SH,
-                 0x6f = testnet address, 0x80 = mainnet WIF, etc.
-        payload: The data to encode.
-
-    Returns:
-        The Base58Check-encoded string.
-    """
-    data = version + payload
-    checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
-    return base58.b58encode(data + checksum).decode('ascii')
-
-
-def _base58check_decode(encoded: str) -> tuple:
-    """
-    Decode a Base58Check-encoded string.
-
-    Validates the checksum and separates the version byte from the payload.
-
-    Args:
-        encoded: The Base58Check-encoded string to decode.
-
-    Returns:
-        A tuple of (version_bytes, payload_bytes).
-
-    Raises:
-        ValueError: If the checksum does not match (invalid or corrupted data).
-    """
-    decoded = base58.b58decode(encoded)
-    # Last 4 bytes are the checksum
-    payload = decoded[:-4]
-    checksum = decoded[-4:]
-    expected = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
-    if checksum != expected:
-        raise ValueError("Invalid Base58Check checksum")
-    return payload[0:1], payload[1:]
+from src.utils.encoding import base58check_encode, base58check_decode
 
 
 # =============================================================================
@@ -235,7 +175,7 @@ class PublicKey:
         pubkey_bytes = self.to_bytes(compressed=True)
         h160 = hash160(pubkey_bytes)
         version = b'\x6f' if testnet else b'\x00'
-        return _base58check_encode(version, h160)
+        return base58check_encode(version, h160)
 
     def get_hash160(self, compressed: bool = True) -> str:
         """
@@ -464,7 +404,7 @@ class PrivateKey:
         payload = self.to_bytes()
         if compressed:
             payload += b'\x01'
-        return _base58check_encode(version, payload)
+        return base58check_encode(version, payload)
 
     @classmethod
     def from_wif(cls, wif_string: str) -> 'PrivateKey':
@@ -483,7 +423,7 @@ class PrivateKey:
         Raises:
             ValueError: If the WIF string has an invalid checksum or format.
         """
-        version, payload = _base58check_decode(wif_string)
+        version, payload = base58check_decode(wif_string)
 
         if version not in (b'\x80', b'\xef'):
             raise ValueError(

@@ -14,24 +14,10 @@ Base58Check encoding is used for addresses to provide a human-readable format
 with a built-in checksum for error detection.
 """
 
-import hashlib
+from src.crypto.hash import double_sha256
 
 # Base58 alphabet used by Bitcoin (excludes 0, O, I, l to avoid ambiguity)
 BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-
-
-def double_sha256(data: bytes) -> bytes:
-    """
-    Compute double SHA-256 hash, as used throughout Bitcoin for block hashes,
-    transaction IDs, and checksums.
-
-    Args:
-        data: The bytes to hash.
-
-    Returns:
-        The 32-byte double SHA-256 digest.
-    """
-    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 
 # ---------------------------------------------------------------------------

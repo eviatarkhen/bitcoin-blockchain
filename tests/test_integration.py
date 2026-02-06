@@ -8,11 +8,6 @@ End-to-end tests that exercise the full stack:
 These tests verify that all components work together correctly.
 """
 
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import pytest
 
 from src.core.blockchain import Blockchain
