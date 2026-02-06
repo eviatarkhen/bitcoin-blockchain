@@ -21,8 +21,9 @@ Usage:
     python -m examples.02_send_transaction
 """
 
+import os
 import sys
-sys.path.insert(0, "/home/user/bitcoin-blockchain")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main():
     try:
