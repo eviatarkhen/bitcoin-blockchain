@@ -70,9 +70,10 @@ class BlockchainTester:
         blockchain = Blockchain(development_mode=development_mode)
         wallet = Wallet(blockchain=blockchain, name="miner")
         address = wallet.generate_address()
+        pubkey_hash = wallet.get_keypair(address).public_key.get_hash160()
 
         for _ in range(num_blocks):
-            blockchain.mine_next_block(coinbase_address=address)
+            blockchain.mine_next_block(coinbase_address=pubkey_hash)
 
         return blockchain, wallet
 
@@ -111,7 +112,13 @@ class BlockchainTester:
 
         parent_hash = parent_block.header.hash
         new_height = fork_height + 1
-        difficulty_bits = blockchain.get_current_difficulty()
+        # Use the difficulty from the existing block at this height (same
+        # difficulty rules apply to fork blocks at the same height).
+        existing = blockchain.get_block_by_height(new_height)
+        if existing is not None:
+            difficulty_bits = existing.header.difficulty_bits
+        else:
+            difficulty_bits = blockchain.get_current_difficulty()
 
         # Create wallets for miners if not provided
         if miner_wallets is None:
@@ -121,7 +128,7 @@ class BlockchainTester:
                 w.generate_address()
                 miner_wallets.append(w)
 
-        miner = Miner(instant_mine=True)
+        miner = Miner(instant_mine=False)
         competing_blocks = []
 
         for i in range(num_branches):
@@ -219,10 +226,11 @@ class BlockchainTester:
 
         # Extend the main branch to resolve the fork
         main_address = wallet.get_addresses()[0] if wallet.get_addresses() else fork_wallets[0].get_addresses()[0]
+        main_pubkey_hash = wallet.get_keypair(main_address).public_key.get_hash160() if wallet.get_addresses() else fork_wallets[0].get_keypair(main_address).public_key.get_hash160()
         print("Mining additional blocks to resolve fork...")
         for i in range(3):
             try:
-                blockchain.mine_next_block(coinbase_address=main_address)
+                blockchain.mine_next_block(coinbase_address=main_pubkey_hash)
                 print(f"  Mined block at height {blockchain.get_chain_height()}")
             except Exception as e:
                 print(f"  Mining block failed: {e}")

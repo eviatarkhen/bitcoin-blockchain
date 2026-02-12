@@ -91,8 +91,8 @@ class TestTransactionFlow:
         bob = Wallet(blockchain=blockchain, name="Bob")
         bob_addr = bob.generate_address()
 
-        # Mine blocks to fund Alice
-        for _ in range(3):
+        # Mine blocks to fund Alice (need enough for coinbase maturity)
+        for _ in range(6):
             blockchain.mine_next_block(coinbase_address=alice_hash)
 
         alice_balance_before = alice.get_balance()
@@ -201,8 +201,8 @@ class TestBlockchainProperties:
         bob_addr = bob.generate_address()
         bob_hash = bob.get_keypair(bob_addr).public_key.get_hash160()
 
-        # Mine blocks to Alice
-        for _ in range(3):
+        # Mine blocks to Alice (need enough for coinbase maturity)
+        for _ in range(6):
             blockchain.mine_next_block(coinbase_address=alice_hash)
 
         total_before = alice.get_balance()

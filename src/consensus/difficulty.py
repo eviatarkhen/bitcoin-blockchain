@@ -96,6 +96,11 @@ DEV_GENESIS_DIFFICULTY_BITS = 0x1f0fffff
 With exponent=0x1f=31 and coefficient=0x0fffff, the target is enormous,
 allowing blocks to be mined almost instantly with CPU mining."""
 
+DEV_COINBASE_MATURITY = 5
+"""Number of confirmations required before coinbase outputs can be spent
+in development mode. Much lower than mainnet (100) so examples and tests
+can send transactions after mining just a few blocks."""
+
 # ---------------------------------------------------------------------------
 # Halving constants
 # ---------------------------------------------------------------------------

@@ -163,11 +163,14 @@ def validate_block(block: "Block", blockchain: object) -> bool:
     # ---------------------------------------------------------------
     # 7. Validate all transactions in the block
     # ---------------------------------------------------------------
+    coinbase_maturity = getattr(blockchain, '_coinbase_maturity', 100)
     if not is_genesis:
         try:
-            validate_block_transactions(block, blockchain.utxo_set, expected_height)
+            validate_block_transactions(block, blockchain.utxo_set, expected_height, coinbase_maturity)
         except ValidationError:
             raise
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
         except Exception as e:
             logger.warning("Transaction validation encountered an error: %s", e)
 
@@ -205,6 +208,7 @@ def validate_block_transactions(
     block: "Block",
     utxo_set: "UTXOSet",
     block_height: int,
+    coinbase_maturity: int = 100,
 ) -> bool:
     """
     Validate every transaction in a block against the UTXO set.
@@ -227,6 +231,7 @@ def validate_block_transactions(
         block: The block whose transactions are being validated.
         utxo_set: The current UTXO set (before this block is applied).
         block_height: The height at which this block will be placed.
+        coinbase_maturity: Required confirmations for coinbase outputs.
 
     Returns:
         True if all transactions are valid.
@@ -246,7 +251,7 @@ def validate_block_transactions(
             continue
 
         try:
-            validate_transaction(tx, working_utxo, block_height)
+            validate_transaction(tx, working_utxo, block_height, coinbase_maturity)
         except ValidationError as e:
             raise ValidationError(
                 f"Transaction {tx.txid[:16]} at index {i} failed validation: {e}"
@@ -279,6 +284,7 @@ def validate_transaction(
     tx: "Transaction",
     utxo_set: "UTXOSet",
     current_height: int = 0,
+    coinbase_maturity: int = 100,
 ) -> bool:
     """
     Validate a standalone (non-coinbase) transaction.
@@ -296,6 +302,7 @@ def validate_transaction(
         utxo_set: The UTXO set to validate against.
         current_height: The height of the block being validated (used for
             coinbase maturity checks).
+        coinbase_maturity: Required confirmations for coinbase outputs.
 
     Returns:
         True if the transaction is valid.
@@ -330,7 +337,7 @@ def validate_transaction(
         from src.consensus.rules import validate_coinbase_maturity
         if not validate_coinbase_maturity(
             inp.previous_txid, inp.previous_output_index,
-            utxo, current_height
+            utxo, current_height, maturity=coinbase_maturity,
         ):
             raise ValidationError(
                 f"Input {i} fails coinbase maturity check "

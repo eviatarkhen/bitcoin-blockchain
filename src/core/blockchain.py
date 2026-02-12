@@ -102,19 +102,23 @@ class Blockchain:
                 DEV_GENESIS_DIFFICULTY_BITS,
                 DEV_DIFFICULTY_ADJUSTMENT_INTERVAL,
                 DEV_TARGET_BLOCK_TIME,
+                DEV_COINBASE_MATURITY,
             )
-            self._difficulty_bits: int = DEV_GENESIS_DIFFICULTY_BITS
+            self._max_target_bits: int = DEV_GENESIS_DIFFICULTY_BITS
             self._adjustment_interval: int = DEV_DIFFICULTY_ADJUSTMENT_INTERVAL
             self._target_block_time: int = DEV_TARGET_BLOCK_TIME
+            self._coinbase_maturity: int = DEV_COINBASE_MATURITY
         else:
             from src.consensus.difficulty import (
                 GENESIS_DIFFICULTY_BITS,
                 DIFFICULTY_ADJUSTMENT_INTERVAL,
                 TARGET_BLOCK_TIME,
             )
-            self._difficulty_bits = GENESIS_DIFFICULTY_BITS
+            from src.consensus.rules import COINBASE_MATURITY
+            self._max_target_bits = GENESIS_DIFFICULTY_BITS
             self._adjustment_interval = DIFFICULTY_ADJUSTMENT_INTERVAL
             self._target_block_time = TARGET_BLOCK_TIME
+            self._coinbase_maturity = COINBASE_MATURITY
 
         # The target timespan is the ideal total time for one adjustment interval
         self._target_timespan: int = self._adjustment_interval * self._target_block_time
@@ -170,7 +174,7 @@ class Blockchain:
             previous_block_hash="0" * 64,
             merkle_root=merkle_root,
             timestamp=genesis_timestamp,
-            difficulty_bits=self._difficulty_bits,
+            difficulty_bits=self._max_target_bits,
             nonce=0,
         )
 
@@ -718,7 +722,12 @@ class Blockchain:
 
         If the height falls on a difficulty adjustment boundary, the new
         difficulty is calculated from the timestamps of the previous
-        adjustment interval. Otherwise, the current difficulty is unchanged.
+        adjustment interval. Otherwise, the difficulty from the previous
+        block is used.
+
+        This method is deterministic for a given height and chain state:
+        it derives everything from blocks already in the chain, never from
+        mutable instance state.
 
         Args:
             height: The height of the block being validated or mined.
@@ -732,32 +741,40 @@ class Blockchain:
         )
 
         if height == 0:
-            return self._difficulty_bits
+            return self._max_target_bits
+
+        # Get the difficulty from the previous block (the base difficulty
+        # for this period). This avoids depending on self._difficulty_bits
+        # which can be stale or double-updated.
+        prev_block = self.get_block_by_height(height - 1)
+        if prev_block is None:
+            return self._max_target_bits
+        current_bits = prev_block.header.difficulty_bits
 
         if not should_adjust(height, self._adjustment_interval):
-            return self._difficulty_bits
+            return current_bits
 
         # Gather timestamps for the adjustment calculation.
-        # We need the timestamps spanning the last adjustment_interval blocks.
-        chain = self.get_chain()
-        if len(chain) < 2:
-            return self._difficulty_bits
-
-        # Get timestamps of the blocks in the most recent adjustment interval
-        interval_start = max(0, len(chain) - self._adjustment_interval)
-        block_timestamps = [blk.header.timestamp for blk in chain[interval_start:]]
+        # For height h (where h % interval == 0), use blocks from
+        # heights (h - interval) to (h - 1).
+        period_start = height - self._adjustment_interval
+        block_timestamps = []
+        for h in range(period_start, height):
+            blk = self.get_block_by_height(h)
+            if blk is not None:
+                block_timestamps.append(blk.header.timestamp)
 
         if len(block_timestamps) < 2:
-            return self._difficulty_bits
+            return current_bits
 
         new_bits = calculate_next_difficulty(
             block_timestamps,
-            self._difficulty_bits,
+            current_bits,
             self._adjustment_interval,
             self._target_timespan,
+            max_target_bits=self._max_target_bits,
         )
 
-        self._difficulty_bits = new_bits
         logger.info("Difficulty adjusted at height %d: new bits = %#x", height, new_bits)
         return new_bits
 
@@ -814,6 +831,13 @@ class Blockchain:
             coinbase_address=coinbase_address,
             reward_amount=reward,
         )
+
+        # Ensure the timestamp is strictly greater than the Median Time Past.
+        # Bitcoin Core uses max(MTP + 1, current_time). When blocks are mined
+        # faster than 1 second (common in dev mode), timestamps can collide
+        # with the MTP, causing validation failure.
+        block.header.timestamp = max(block.header.timestamp, tip.header.timestamp + 1)
+        block.header._hash = None  # Invalidate cached hash after timestamp change
 
         # Mine the block
         miner = Miner(instant_mine=False)
@@ -957,7 +981,7 @@ class Blockchain:
             "blocks": blocks_dict,
             "utxo_set": self.utxo_set.to_dict(),
             "mempool": self.mempool.to_dict(),
-            "difficulty_bits": self._difficulty_bits,
+            "difficulty_bits": self.get_current_difficulty(),
             "adjustment_interval": self._adjustment_interval,
             "target_timespan": self._target_timespan,
             "target_block_time": self._target_block_time,

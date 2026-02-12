@@ -1,74 +1,72 @@
 # Context: Bitcoin Blockchain Core Implementation
 
-**Last Updated**: 2026-02-06
+**Last Updated**: 2026-02-06 (implementation complete)
 
 ---
 
 ## Critical Files
 
-### Files to Create
+### Implemented Files (all complete)
 
 **Core Components:**
-- `src/core/block.py` - Block and BlockHeader classes (80-byte header, Bitcoin-accurate)
-- `src/core/transaction.py` - Transaction, TransactionInput, TransactionOutput classes
-- `src/core/blockchain.py` - Blockchain management, chain tips, fork handling
-- `src/core/utxo.py` - UTXO set management (track unspent outputs)
-- `src/core/mempool.py` - Transaction pool with fee prioritization
+- `src/core/block.py` (506 lines) - Block and BlockHeader classes (80-byte header, Bitcoin-accurate)
+- `src/core/transaction.py` (660 lines) - Transaction, TransactionInput, TransactionOutput classes
+- `src/core/blockchain.py` (999 lines) - Blockchain management, chain tips, fork handling, JSON export/import
+- `src/core/utxo.py` (350 lines) - UTXO set management (track unspent outputs)
+- `src/core/mempool.py` (284 lines) - Transaction pool with fee prioritization
 
 **Cryptography:**
-- `src/crypto/hash.py` - SHA-256, RIPEMD-160 hashing utilities
-- `src/crypto/keys.py` - ECDSA key management (secp256k1), signing, verification
-- `src/crypto/merkle.py` - Merkle tree wrapper using merkletools library
+- `src/crypto/hash.py` (163 lines) - SHA-256, RIPEMD-160, double_sha256, hash160 (single source of truth)
+- `src/crypto/keys.py` (658 lines) - ECDSA key management (secp256k1), signing, verification, WIF
+- `src/crypto/merkle.py` (305 lines) - Custom Merkle tree implementation (from scratch, not merkletools)
 
 **Mining:**
-- `src/mining/miner.py` - Proof-of-Work mining, nonce search, difficulty handling
+- `src/mining/miner.py` (506 lines) - Proof-of-Work mining, nonce search, compact bits conversion, block template creation
 
 **Consensus:**
-- `src/consensus/difficulty.py` - Difficulty adjustment algorithm (every 2016 blocks)
-- `src/consensus/rules.py` - All Bitcoin consensus rules
-- `src/consensus/validation.py` - Block and transaction validation logic
+- `src/consensus/difficulty.py` (327 lines) - Difficulty adjustment algorithm, block reward halving
+- `src/consensus/rules.py` (507 lines) - Block size, coinbase, maturity, timestamp validation
+- `src/consensus/validation.py` (472 lines) - Full block and transaction validation pipeline
 
 **Wallet:**
-- `src/wallet/wallet.py` - Key management, balance tracking, transaction creation
+- `src/wallet/wallet.py` (506 lines) - Key management, balance tracking, coin selection, tx creation/signing
 
 **Utilities:**
-- `src/utils/serialization.py` - Binary serialization for blocks/transactions
-- `src/utils/encoding.py` - Base58Check, hex conversions
-- `src/utils/visualizer.py` - CLI blockchain visualization (rich library)
+- `src/utils/serialization.py` (148 lines) - Binary serialization helpers
+- `src/utils/encoding.py` (401 lines) - Base58Check, hex/bytes conversions, varint encoding
+- `src/utils/visualizer.py` (562 lines) - CLI blockchain visualization (rich library, graceful fallback)
 
 **Examples:**
-- `examples/01_basic_mining.py` - Mine first block demonstration
-- `examples/02_send_transaction.py` - Create and send transaction
-- `examples/03_fork_handling.py` - Fork creation and resolution
-- `examples/04_difficulty_adjust.py` - Difficulty adjustment demonstration
-- `examples/05_full_demo.py` - Complete system demonstration
-- `examples/debug_flows/01_mine_first_block.py` - Debug script with breakpoints
-- `examples/debug_flows/02_send_transaction.py` - Transaction debug script
-- `examples/debug_flows/03_fork_resolution.py` - Fork handling debug script
-- `examples/debug_flows/04_difficulty_adjustment.py` - Difficulty debug script
-- `examples/helpers/blockchain_tester.py` - Fork testing utilities
+- `examples/01_basic_mining.py` - Mine blocks, show wallet balance
+- `examples/02_send_transaction.py` - Create wallets, mine, send between wallets
+- `examples/03_fork_handling.py` - Fork creation and resolution demonstration
+- `examples/04_difficulty_adjust.py` - Difficulty adjustment over multiple blocks
+- `examples/helpers/blockchain_tester.py` - Programmatic fork creation helper
 
-**Tests:**
-- `tests/test_block.py` - Block and header tests
-- `tests/test_transaction.py` - Transaction tests
-- `tests/test_utxo.py` - UTXO set tests
-- `tests/test_keys.py` - Cryptography tests
-- `tests/test_merkle.py` - Merkle tree tests
-- `tests/test_mining.py` - Mining and PoW tests
-- `tests/test_difficulty.py` - Difficulty adjustment tests
-- `tests/test_blockchain.py` - Blockchain management tests
-- `tests/test_wallet.py` - Wallet functionality tests
-- `tests/test_integration.py` - End-to-end integration tests
+**Tests (200 total):**
+- `tests/test_block.py` (20 tests) - Block and header tests
+- `tests/test_transaction.py` (24 tests) - Transaction tests
+- `tests/test_utxo.py` (12 tests) - UTXO set tests
+- `tests/test_keys.py` (24 tests) - Key management and ECDSA tests
+- `tests/test_merkle.py` (20 tests) - Merkle tree tests
+- `tests/test_mining.py` (20 tests) - Mining and PoW tests
+- `tests/test_difficulty.py` (14 tests) - Difficulty adjustment tests
+- `tests/test_blockchain.py` (18 tests) - Blockchain management tests
+- `tests/test_wallet.py` (23 tests) - Wallet functionality tests
+- `tests/test_integration.py` (25 tests) - End-to-end integration tests
 
 **Configuration:**
-- `requirements.txt` - Python dependencies
-- `setup.py` - Package setup
+- `requirements.txt` - ecdsa, base58, pytest, rich
+- `CLAUDE.md` - Project architecture guide for Claude Code
 - `.gitignore` - Git ignore patterns
-- `README.md` - Project documentation
+- `.venv/` - Python virtual environment
 
-### Files to Modify
+### Files NOT Created (deferred or dropped)
 
-None - this is a new implementation from scratch
+- `examples/05_full_demo.py` - Dropped (04_difficulty_adjust covers the gap)
+- `examples/debug_flows/*.py` - Deferred (directory exists, scripts not yet written)
+- `setup.py` - Not needed (project runs directly)
+- Flask web explorer - Optional, not implemented
 
 ---
 
@@ -86,9 +84,9 @@ None - this is a new implementation from scratch
    - **Reasoning**: This is Bitcoin's actual design; understanding UTXO is fundamental
    - **Trade-offs**: More complex than account model, but necessary for authentic implementation
 
-4. **Decision**: Use merkletools library for Merkle trees
-   - **Reasoning**: Well-tested library, focus learning on usage not implementation details
-   - **Trade-offs**: External dependency, but saves time for more interesting components
+4. **Decision**: Custom Merkle tree implementation (from scratch)
+   - **Reasoning**: merkletools library unavailable (pysha3 build failure); implemented using hashlib
+   - **Trade-offs**: More code to maintain, but deeper understanding of Merkle tree internals
 
 5. **Decision**: Multiple mining modes (low difficulty, instant, deterministic)
    - **Reasoning**: Real mining takes too long for development/debugging
@@ -120,15 +118,14 @@ None - this is a new implementation from scratch
 
 ### Package Dependencies
 
-- `hashlib` (stdlib) - SHA-256 hashing
+- `hashlib` (stdlib) - SHA-256, RIPEMD-160 hashing
 - `json` (stdlib) - JSON serialization
-- `datetime` (stdlib) - Timestamps
-- `ecdsa` - ECDSA signatures (secp256k1 curve)
-- `base58` - Bitcoin address encoding with checksum
-- `merkletools` - Merkle tree construction and proof generation
-- `pytest` - Testing framework
-- `rich` - CLI visualization (tables, trees, formatted output)
-- `flask` (optional) - Web interface for blockchain explorer
+- `ecdsa>=0.18.0` - ECDSA signatures (secp256k1 curve)
+- `base58>=2.1.1` - Bitcoin address encoding with checksum
+- `pytest>=7.0.0` - Testing framework
+- `rich>=13.0.0` - CLI visualization (tables, trees, formatted output)
+- ~~`merkletools`~~ - NOT used (pysha3 build failure); Merkle tree built from scratch
+- ~~`flask`~~ - NOT used (optional web explorer not implemented)
 
 ### External Services
 
@@ -250,9 +247,10 @@ None - this is a standalone local implementation
 
 **Related Documentation:**
 - Bitcoin Whitepaper: https://bitcoin.org/bitcoin.pdf
-- Plan file: `/Users/eviatarkhen/.claude/plans/swirling-coalescing-wand.md`
 - GitHub repository: https://github.com/eviatarkhen/bitcoin-blockchain
+- Implementation branch: `claude/bitcoin-agents-implementation-oMBNz`
 - Local repository: `/Users/eviatarkhen/Dropbox (Personal)/Development/blockchain_test/bitcoin-blockchain`
+- Architecture guide: `CLAUDE.md` (in repo root)
 
 **Key Whitepaper Sections:**
 - Section 3: Timestamp Server (block linking)

@@ -208,24 +208,25 @@ def validate_coinbase_maturity(
     txid: str,
     output_index: int,
     utxo_entry,
-    current_height: int
+    current_height: int,
+    maturity: int = COINBASE_MATURITY,
 ) -> bool:
     """
     Validate that a coinbase output has reached sufficient maturity before
     being spent.
 
-    Coinbase outputs (the mining rewards) cannot be spent until 100 blocks
-    have been built on top of the block containing them. This rule exists
-    because:
+    Coinbase outputs (the mining rewards) cannot be spent until a certain
+    number of blocks have been built on top of the block containing them.
+    On mainnet this is 100 blocks; in development mode it can be lower.
+    This rule exists because:
 
     1. Blockchain reorganizations (reorgs) can orphan blocks, making their
        coinbase transactions invalid.
     2. If coinbase outputs could be spent immediately, a reorg could
        invalidate not just the coinbase but all subsequent transactions
        that spent those coins, creating a cascade of invalid transactions.
-    3. The 100-block maturity requirement makes such cascading invalidation
-       extremely unlikely, since reorgs deeper than 100 blocks are
-       practically impossible.
+    3. The maturity requirement makes such cascading invalidation
+       extremely unlikely, since deep reorgs are practically impossible.
 
     Args:
         txid: The transaction ID of the output being spent.
@@ -234,6 +235,8 @@ def validate_coinbase_maturity(
             `is_coinbase` (bool) and `block_height` (int) attributes.
         current_height: The height of the block that contains the
             spending transaction.
+        maturity: The required number of confirmations. Defaults to
+            COINBASE_MATURITY (100). Use a lower value in development mode.
 
     Returns:
         True if the output is mature enough to be spent (or is not from
@@ -241,7 +244,7 @@ def validate_coinbase_maturity(
 
     Raises:
         ValueError: If the coinbase output has not reached the required
-            maturity of COINBASE_MATURITY (100) blocks.
+            maturity.
     """
     # Non-coinbase outputs can be spent immediately (no maturity requirement)
     if not utxo_entry.is_coinbase:
@@ -250,13 +253,13 @@ def validate_coinbase_maturity(
     # Calculate how many blocks have been built on top of the coinbase block
     confirmations = current_height - utxo_entry.block_height
 
-    if confirmations < COINBASE_MATURITY:
+    if confirmations < maturity:
         raise ValueError(
             f"Coinbase output {txid}:{output_index} is immature. "
-            f"Has {confirmations} confirmations, needs {COINBASE_MATURITY}. "
+            f"Has {confirmations} confirmations, needs {maturity}. "
             f"Coinbase block height: {utxo_entry.block_height}, "
             f"current height: {current_height}. "
-            f"Must wait {COINBASE_MATURITY - confirmations} more blocks."
+            f"Must wait {maturity - confirmations} more blocks."
         )
 
     return True
