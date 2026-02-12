@@ -9,7 +9,7 @@ Educational Bitcoin full archival node implementation (no P2P networking). Imple
 ## Commands
 
 ```bash
-# Run all tests (200 tests, ~1s)
+# Run all tests (200 tests, ~2s)
 pytest tests/
 
 # Run a single test file
@@ -21,6 +21,8 @@ pytest tests/test_integration.py::TestMiningAndBalance::test_mine_and_check_bala
 # Run examples (from project root)
 python -m examples.01_basic_mining
 python -m examples.02_send_transaction
+python -m examples.03_fork_handling
+python -m examples.04_difficulty_adjust
 
 # Install dependencies
 pip install ecdsa base58 pytest rich
@@ -68,11 +70,28 @@ The UTXO set stores and matches by **hash160 hex** (40-char pubkey hash), NOT Bi
 - Difficulty `0x1f0fffff` — blocks mine in ~0.01s (~1000-10000 nonce attempts)
 - Adjustment interval: 10 blocks (not 2016)
 - Target block time: 5 seconds (not 600)
+- Coinbase maturity: 5 blocks (not 100) — mine at least 5 blocks before spending rewards
 
 `Blockchain(development_mode=False)`:
 - Real Bitcoin difficulty `0x1d00ffff`, 2016-block intervals, 10-minute targets
+- Coinbase maturity: 100 blocks
 
 **Important**: `Miner(instant_mine=True)` sets nonce=0 without doing PoW, but `validate_block()` still checks `meets_difficulty_target()`. Blocks from instant_mine will be rejected by `add_block()`. Use real mining with dev difficulty instead.
+
+## Difficulty Adjustment
+
+`_get_next_difficulty(height)` is a pure function — it derives everything from blocks already in the chain:
+- Base difficulty comes from `block_by_height(height - 1)`, not mutable instance state
+- Timestamps come from the fixed adjustment period window (heights `h - interval` to `h - 1`)
+- `_max_target_bits` stores the genesis/minimum difficulty for the chain (dev or prod) and is passed to `calculate_next_difficulty` as the floor
+
+Timestamps: `mine_next_block` bumps the block timestamp to `max(time(), tip.timestamp + 1)` to avoid Median Time Past validation failures when blocks mine faster than 1 second.
+
+## Validation Flow
+
+`validate_block` → `validate_block_transactions` → `validate_transaction` → `validate_coinbase_maturity`
+
+The coinbase maturity value is threaded from `blockchain._coinbase_maturity` through all validation layers. Consensus rules in `rules.py` raise `ValueError`; the `validate_block` function catches these and converts them to `ValidationError` to ensure blocks are properly rejected.
 
 ## Key Design Decisions
 
@@ -81,8 +100,8 @@ The UTXO set stores and matches by **hash160 hex** (40-char pubkey hash), NOT Bi
 - **Simplified P2PKH only**: No full Bitcoin Script engine. `pubkey_script` is just the hash160 hex of the public key. `signature_script` is `signature_hex + pubkey_hex`.
 - **Merkle tree from scratch**: `merkletools` library unavailable (pysha3 build fails). Custom implementation in `src/crypto/merkle.py` using `hashlib`.
 - **Genesis block**: Hardcoded with nonce=0, inserted without PoW validation. Uses timestamp `1231006505` (Bitcoin's real genesis).
-- **Coinbase maturity**: 100 blocks must be mined before coinbase outputs can be spent (enforced in `rules.py`).
-- **Fork handling**: Longest chain wins. `_reorganize_chain()` finds common ancestor, unwinds old blocks (reverting UTXOs), applies new blocks.
+- **Coinbase maturity**: Configurable per mode — 5 blocks (dev) or 100 blocks (prod). Enforced in `rules.py`, threaded through validation.
+- **Fork handling**: Longest chain wins. `_reorganize_chain()` finds common ancestor, unwinds old blocks (reverting UTXOs), applies new blocks. Equal-height forks keep the first-seen chain tip.
 
 ## Dependencies
 
